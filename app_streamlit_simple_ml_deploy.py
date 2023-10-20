@@ -12,13 +12,16 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix
 
+class SessionState(object):
+    def __init__(self, **kwargs):
+        for key, val in kwargs.items():
+            setattr(self, key, val)
 
 ##### Programando a Barra Superior da Aplicação Web #####
 
 # Títulos Estilizados
-st.markdown("# Formação Engenheiro de Machine Learning")
-st.markdown("### Deploy de Modelos de Machine Learning")
-st.markdown("#### Deploy de Aplicações Preditivas com Streamlit")
+st.markdown("# Deploy de Modelos de Machine Learning")
+st.markdown("Murilo M Silvestrini")
 st.title("Regressão Logística")
 
 ##### Programando a Barra Lateral de Navegação da Aplicação Web #####
@@ -122,10 +125,18 @@ st.write(Dataframe)
 
 ##### Programando o Botão de Ação ##### 
 
-if(st.sidebar.button("Clique Para Treinar o Modelo de Regressão Logística")):
+# Criação ou obtenção do estado de sessão
+session_state = st.session_state if hasattr(st, 'session_state') else SessionState()
+
+# Verifica se o modelo já foi treinado
+if not hasattr(session_state, 'modelo'):
+    session_state.modelo = None
+
+if st.sidebar.button("Treinar o Modelo"):
     with st.spinner('Carregando o Dataset...'):
         time.sleep(.5)
     st.success("Dataset Carregado!")
+    session_state.modelo = cria_modelo(parameters)
     modelo = cria_modelo(parameters) 
     my_bar = st.progress(0)
     for percent_complete in range(100):
@@ -151,19 +162,26 @@ if(st.sidebar.button("Clique Para Treinar o Modelo de Regressão Logística")):
     
 
 
-    # Solicitando dados do usuário para fazer uma nova previsão
-    st.subheader("Faça uma Nova Previsão")
-    user_input = []
-    for feature_name in Data.feature_names:
-        value = st.number_input(f"{feature_name}:", value=float(0))
-        user_input.append(value)
+    if session_state.modelo:  # Supondo que você ainda está usando session_state para armazenar o modelo
 
-    # Botão para prever com base nos dados inseridos pelo usuário
-    if st.button("Obter Previsão"):
-        # Fake prediction
-        fake_prediction = np.random.choice(targets)
-        st.write(f"Previsão (Simulação): {fake_prediction}")
-        st.write("Nota: Esta é uma simulação e não reflete a previsão real do modelo treinado.")
+        # Gerando dados aleatórios para previsão
+        user_input = []
+        st.subheader("Dados de Simulação para Nova Previsão")
+        for feature_name in Data.feature_names:
+            # Aqui estou assumindo que você quer valores aleatórios entre 0 e 1, ajuste conforme necessário
+            value = np.random.rand()
+            st.write(f"{feature_name}: {value:.4f}")
+            user_input.append(value)
+
+        # Fazendo a previsão com os dados aleatórios
+        prediction = session_state.modelo["modelo"].predict([user_input])[0]
+        st.write(f"Previsão com Dados Simulados: {targets[prediction]}")
+        
+        st.write("""
+        Em uma aplicação em produção, em vez de usar valores aleatórios como fizemos aqui, 
+        o usuário teria a opção de inserir seus próprios dados e obter previsões em tempo real.
+        """)
+
 
     # Informação adicional sobre a previsão real
     st.markdown("""
