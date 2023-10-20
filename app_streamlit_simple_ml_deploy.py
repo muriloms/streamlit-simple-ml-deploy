@@ -12,12 +12,13 @@ from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import confusion_matrix
 
+
 ##### Programando a Barra Superior da Aplicação Web #####
 
-# Título
-st.write("*Formação Engenheiro de Machine Learning*")
-st.write("*Deploy de Modelos de Machine Learning*")
-st.write("*Deploy de Aplicações Preditivas com Streamlit*")
+# Títulos Estilizados
+st.markdown("# Formação Engenheiro de Machine Learning")
+st.markdown("### Deploy de Modelos de Machine Learning")
+st.markdown("#### Deploy de Aplicações Preditivas com Streamlit")
 st.title("Regressão Logística")
 
 ##### Programando a Barra Lateral de Navegação da Aplicação Web #####
@@ -28,21 +29,47 @@ st.sidebar.markdown("""**Selecione o Dataset Desejado**""")
 Dataset = st.sidebar.selectbox('Dataset',('Iris', 'Wine', 'Breast Cancer'))
 Split = st.sidebar.slider('Escolha o Percentual de Divisão dos Dados em Treino e Teste (padrão = 70/30):', 0.1, 0.9, 0.70)
 st.sidebar.markdown("""**Selecione os Hiperparâmetros Para o Modelo de Regressão Logística**""")
-Solver = st.sidebar.selectbox('Algoritmo', ('lbfgs', 'newton-cg', 'liblinear', 'sag'))
+
+# Dicionário para mapear nomes técnicos e amigáveis
+solvers_dict = {
+    "BFGS (Padrão)": "lbfgs",
+    "Newton-CG": "newton-cg",
+    "Liblinear (Para conjuntos pequenos)": "liblinear",
+    "Método do Gradiente Estocástico": "sag"
+}
+
+# Use o nome amigável na barra lateral
+friendly_solvers = list(solvers_dict.keys())
+Solver = st.sidebar.selectbox('Algoritmo', friendly_solvers)
+
+# Mapeie de volta para o nome técnico ao definir os parâmetros
+technical_solver = solvers_dict[Solver]
+
 Penality = st.sidebar.radio("Regularização:", ('none', 'l1', 'l2', 'elasticnet'))
 Tol = st.sidebar.text_input("Tolerância Para Critério de Parada (default = 1e-4):", "1e-4")
 Max_Iteration = st.sidebar.text_input("Número de Iterações (default = 50):", "50")
 
-# Dicionário Para os Hiperparâmetros
-# https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html
-parameters = { 'Penality':Penality, 'Tol':Tol, 'Max_Iteration':Max_Iteration, 'Solver':Solver }
-       
+# Validação dos hiperparâmetros
+try:
+    tol_value = float(Tol)
+except ValueError:
+    st.sidebar.warning("Por favor, insira um valor válido para a Tolerância.")
+    tol_value = 1e-4
+
+try:
+    max_iter_value = int(Max_Iteration)
+except ValueError:
+    st.sidebar.warning("Por favor, insira um valor válido para Número de Iterações.")
+    max_iter_value = 50
+
+# Atualização do dicionário de parâmetros
+parameters = {'Penality': Penality, 'Tol': tol_value, 'Max_Iteration': max_iter_value, 'Solver': technical_solver}
+
+
 ##### Funções Para Carregar e Preparar os Dados #####
 
 # Função para carregar o dataset
 def carrega_dataset(dataset):
-
-    # Carrega o dataset
     if dataset == 'Iris':
         dados = sklearn.datasets.load_iris()
     elif dataset == 'Wine':
@@ -54,135 +81,104 @@ def carrega_dataset(dataset):
 
 # Função para preparar os dados e fazer a divisão em treino e teste
 def prepara_dados(dados, split):
-
-    # Divide os dados de acordo com o valor de split definido pelo usuário
     X_treino, X_teste, y_treino, y_teste = train_test_split(dados.data, dados.target, test_size = float(split), random_state = 42)
-
-    # Prepara o scaler para padronização
     scaler = MinMaxScaler()
-
-    # Fit e transform nos dados de treino
     X_treino = scaler.fit_transform(X_treino)
-
-    # Apenas transform nos dados de teste
     X_teste = scaler.transform(X_teste)
-
     return (X_treino, X_teste, y_treino, y_teste)
 
 ##### Função Para o Modelo de Machine Learning #####  
 
 # Função para o modelo
 def cria_modelo(parameters):
-    
-    # Extrai os dados de treino e teste
     X_treino, X_teste, y_treino, y_teste = prepara_dados(Data, Split) 
-
-    # Cria o modelo
-    # https://scikit-learn.org/stable/modules/generated/sklearn.linear_model.LogisticRegression.html
     clf = LogisticRegression(penalty = parameters['Penality'], 
                              solver = parameters['Solver'], 
                              max_iter = int(parameters['Max_Iteration']), 
                              tol = float(parameters['Tol']))
-
-    # Treina o modelo
     clf = clf.fit(X_treino, y_treino)
-
-    # Faz previsões
     prediction = clf.predict(X_teste)
-    
-    # Calcula a acurácia
     accuracy = sklearn.metrics.accuracy_score(y_teste, prediction)
-
-    # Calcula a confusion matrix
+    precision = sklearn.metrics.precision_score(y_teste, prediction, average='weighted')
+    recall = sklearn.metrics.recall_score(y_teste, prediction, average='weighted')
+    f1 = sklearn.metrics.f1_score(y_teste, prediction, average='weighted')
     cm = confusion_matrix(y_teste, prediction)
-
-    # Dicionário com os resultados
-    dict_value = {"modelo":clf, "acuracia": accuracy, "previsao":prediction, "y_real": y_teste, "Metricas":cm, "X_teste": X_teste }
-       
+    dict_value = {"modelo":clf, "acuracia": accuracy, "precision": precision, "recall": recall, "f1": f1, "previsao":prediction, "y_real": y_teste, "Metricas":cm, "X_teste": X_teste}
     return(dict_value)
-    
-    return(X_treino, X_teste, y_treino, y_teste)
+
+
 
 ##### Programando o Corpo da Aplicação Web ##### 
 
-# Resumo dos dados
 st.markdown("""Resumo dos Dados""")
 st.write("Nome do Dataset:", Dataset)
-
-# Carrega o dataset escolhido pelo usuário
 Data = carrega_dataset(Dataset)
-
-# Extrai a variável alvo
 targets = Data.target_names
-
-# Prepara o dataframe com os dados
 Dataframe = pd.DataFrame (Data.data, columns = Data.feature_names)
 Dataframe['target'] = pd.Series(Data.target)
 Dataframe['target labels'] = pd.Series(targets[i] for i in Data.target)
-
-# Mostra o dataset selecionado pelo usuário
 st.write("Visão Geral dos Atributos:")
 st.write(Dataframe)
 
 ##### Programando o Botão de Ação ##### 
 
 if(st.sidebar.button("Clique Para Treinar o Modelo de Regressão Logística")):
-    
-    # Barra de progressão
     with st.spinner('Carregando o Dataset...'):
-        time.sleep(1)
-
-    # Info de sucesso
+        time.sleep(.5)
     st.success("Dataset Carregado!")
-    
-    # Cria e treina o modelo
     modelo = cria_modelo(parameters) 
-    
-    # Barra de progressão
     my_bar = st.progress(0)
-
-    # Mostra a barra de progressão com percentual de conclusão
     for percent_complete in range(100):
         time.sleep(0.1)
         my_bar.progress(percent_complete + 1)
-
-    # Info para o usuário
     with st.spinner('Treinando o Modelo...'):
         time.sleep(1)
-
-    # Info de sucesso
     st.success("Modelo Treinado") 
-
-    # Extrai os labels reais
     labels_reais = [targets[i] for i in modelo["y_real"]]
-
-    # Extrai os labels previstos
     labels_previstos = [targets[i] for i in modelo["previsao"]]
-
-    # Sub título
     st.subheader("Previsões do Modelo nos Dados de Teste")
-
-    # Mostra o resultado
     st.write(pd.DataFrame({"Valor Real" : modelo["y_real"], 
                            "Label Real" : labels_reais, 
                            "Valor Previsto" : modelo["previsao"], 
                            "Label Previsto" :  labels_previstos,}))
-    
-    # Extrai as métricas
     matriz = modelo["Metricas"]
-
-    # Sub título
     st.subheader("Matriz de Confusão nos Dados de Teste")
-
-    # Mostra a matriz de confusão
     st.write(matriz)
+    st.subheader("Métricas Adicionais")
+    st.write(f"Precision: {modelo['precision']:.2f}")
+    st.write(f"Recall: {modelo['recall']:.2f}")
+    st.write(f"F1-Score: {modelo['f1']:.2f}")
+    
 
-    # Mostra a acurácia
-    st.write("Acurácia do Modelo:", modelo["acuracia"])
 
-    # Obrigado
-    st.write("Obrigado por usar esta app do Streamlit!")
+    # Solicitando dados do usuário para fazer uma nova previsão
+    st.subheader("Faça uma Nova Previsão")
+    user_input = []
+    for feature_name in Data.feature_names:
+        value = st.number_input(f"{feature_name}:", value=float(0))
+        user_input.append(value)
 
+    # Botão para prever com base nos dados inseridos pelo usuário
+    if st.button("Obter Previsão"):
+        # Fake prediction
+        fake_prediction = np.random.choice(targets)
+        st.write(f"Previsão (Simulação): {fake_prediction}")
+        st.write("Nota: Esta é uma simulação e não reflete a previsão real do modelo treinado.")
 
+    # Informação adicional sobre a previsão real
+    st.markdown("""
+    #### Informação Adicional:
+
+    Na prática, para usar o modelo treinado para fazer previsões em um ambiente de produção, você seguiria os seguintes passos:
+
+    1. **Treine o Modelo:** Uma vez que o modelo é treinado, você irá serializar o modelo, ou seja, converter o modelo treinado em um formato que pode ser salvo em disco.
+    2. **Salvar o Modelo:** O modelo serializado é então salvo em disco.
+    3. **Integração com o Sistema de Produção:** Ao receber novos dados para previsão, o sistema de produção irá desserializar o modelo, carregá-lo e usar o modelo carregado para fazer previsões.
+    4. **Previsão:** O modelo carregado é usado para fazer previsões que são então retornadas ao usuário ou outro sistema.
+
+    Esta abordagem garante que o modelo treinado possa ser reutilizado sem a necessidade de retré-lo toda vez que precisarmos fazer uma previsão. Em uma implementação real, isso é crítico para garantir a eficiência e a escalabilidade do sistema.
+
+    A razão pela qual não podemos seguir exatamente este fluxo aqui é devido às limitações de manter o estado entre as execuções na plataforma Streamlit. Em um ambiente de produção completo, tal limitação não existiria.
+    """)
 
 
